@@ -1,25 +1,16 @@
 {
-  "short_name": "Repibox",
-  "name": "The recipe extension that instantly jumps to the recipe  ",
+  "short_name": "Foodie",
+  "name": "Foodie — discover and cook recipes",
   "icons": [
     {
-      "src": "logo.png",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#047857",
   "background_color": "#ffffff"
 }

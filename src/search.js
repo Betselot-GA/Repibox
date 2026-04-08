@@ -1,126 +1,210 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { searchRecipes } from "./utils/queries.js";
-import { useInfiniteQuery } from "react-query";
-import { useInView } from "react-intersection-observer";
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "react-query";
+import { fetchAdvancedSearch } from "./utils/queries.js";
 import RecipeCard from "./components/RecipeCard";
-import { AiOutlineSearch } from "react-icons/ai";
-import { useNavigate } from "react-router-dom";
 import Headers from "./components/Header.js";
 import Footers from "./components/Footer.js";
-export default function search() {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  let { q } = useParams();
+import RecipeSearchPanel from "./components/RecipeSearchPanel.js";
 
-  const { ref, inView } = useInView();
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
+const PAGE_SHELL =
+  "min-h-screen bg-gradient-to-b from-emerald-50/95 via-white to-slate-50/90";
+const PAGE_INNER =
+  "w-full max-w-[1600px] mx-auto px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:px-10";
 
-  //   const { status, data, error } = useQuery(['recipes', q], searchRecipes)
-  const {
-    status,
-    data,
-    error,
-    isFetchingNextPage,
-    fetchNextPage,
-    hasNextPage,
-  } = useInfiniteQuery(["recipes", q], searchRecipes, {
-    getNextPageParam: (lastPage) => lastPage.page ?? undefined,
-  });
+const RECIPE_GRID =
+  "grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-8";
 
-  const resultCount = data?.pages[0].posts.length;
-  const submitData = async (e) => {
-    e.preventDefault();
-    navigate("/" + searchQuery, { replace: true });
-  };
+function sortPosts(posts, sort) {
+  if (!posts || posts.length === 0) return posts || [];
+  if (sort === "name-asc") {
+    return [...posts].sort((a, b) =>
+      (a.post_title || "").localeCompare(b.post_title || "", undefined, {
+        sensitivity: "base",
+      })
+    );
+  }
+  if (sort === "name-desc") {
+    return [...posts].sort((a, b) =>
+      (b.post_title || "").localeCompare(a.post_title || "", undefined, {
+        sensitivity: "base",
+      })
+    );
+  }
+  return posts;
+}
 
-  useEffect(() => {
-    if (inView) {
-      fetchNextPage();
-    }
-  }, [fetchNextPage, inView]);
+function hasLetterParam(letterRaw) {
+  const L = (letterRaw || "").trim().toLowerCase().slice(0, 1);
+  return L >= "a" && L <= "z";
+}
+
+export default function Search() {
+  const [searchParams] = useSearchParams();
+  const q = searchParams.get("q") || searchParams.get("name") || "";
+  const tags = searchParams.get("tags") || "";
+  const category = searchParams.get("category") || "";
+  const area = searchParams.get("area") || "";
+  const ingredient = searchParams.get("ingredient") || "";
+  const letterRaw = searchParams.get("letter") || "";
+  const sort = searchParams.get("sort") || "relevance";
+  const limit = searchParams.get("limit") || "72";
+
+  const hasSearch = Boolean(
+    q.trim() ||
+      tags.trim() ||
+      category ||
+      area ||
+      ingredient.trim() ||
+      hasLetterParam(letterRaw)
+  );
+
+  const { data: posts = [], status, error } = useQuery(
+    ["search", q, tags, category, area, ingredient, letterRaw, limit],
+    () =>
+      fetchAdvancedSearch({
+        q,
+        tags,
+        category,
+        area,
+        ingredient,
+        firstLetter: letterRaw,
+        limit,
+      }),
+    { enabled: hasSearch }
+  );
+
+  const sortedPosts = useMemo(
+    () => sortPosts(posts, sort),
+    [posts, sort]
+  );
+
+  const resultCount = sortedPosts.length;
+  const showEmpty = hasSearch && status === "success" && resultCount === 0;
+  const loading = hasSearch && status === "loading";
+
+  const sortLabel =
+    sort === "name-asc"
+      ? "Name A–Z"
+      : sort === "name-desc"
+      ? "Name Z–A"
+      : "Relevance";
 
   return (
     <>
       <Headers header={false} />
-      <section className="bg-white py-8">
-        <div className="container mx-auto flex items-center flex-wrap pt-4 pb-12">
-          <nav id="store" className="w-full z-30 top-0 px-6 py-1">
-            <div className="w-full container mx-auto flex flex-wrap items-center justify-between mt-0 px-2 py-3">
-              <a
-                className="uppercase tracking-wide no-underline hover:no-underline font-bold text-gray-800 text-xl "
-                href="/"
-                id="recipes"
-              >
-                {resultCount} Result(s) Found
-              </a>
-
-              <form
-                onSubmit={submitData}
-                className="flex items-center"
-                id="store-nav-content"
-              >
-                <input
-                  type="text"
-                  className="border rounded py-1 px-3"
-                  placeholder="search recipe..."
-                  value={searchQuery}
-                  required
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-
-                <button
-                  disabled={searchQuery == null}
-                  type="submit"
-                  className="pl-3 inline-block no-underline hover:text-black"
-                  href="/"
-                >
-                  <AiOutlineSearch size={25} />
-                </button>
-              </form>
+      <section className={PAGE_SHELL}>
+        <div className={PAGE_INNER}>
+          <nav
+            className="mb-10 w-full border-b border-emerald-100/90 pb-8"
+            aria-label="Search"
+          >
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p
+                    className="text-lg font-bold uppercase tracking-wide text-gray-800 sm:text-xl"
+                    id="recipes"
+                  >
+                    {loading ? (
+                      "Searching…"
+                    ) : hasSearch ? (
+                      <>
+                        <span className="text-gray-900">{resultCount}</span>{" "}
+                        <span className="font-semibold text-gray-600">
+                          {resultCount === 1 ? "result" : "results"}
+                        </span>
+                      </>
+                    ) : (
+                      "Search recipes"
+                    )}
+                  </p>
+                  {hasSearch && (
+                    <p className="mt-2 max-w-4xl text-sm leading-relaxed text-gray-600">
+                      {q && <span>Keywords: &ldquo;{q}&rdquo;. </span>}
+                      {tags && <span>Tags: {tags}. </span>}
+                      {category && <span>Type: {category}. </span>}
+                      {area && <span>Country: {area}. </span>}
+                      {ingredient && (
+                        <span>Ingredients: {ingredient}. </span>
+                      )}
+                      {hasLetterParam(letterRaw) && (
+                        <span>
+                          First letter:{" "}
+                          {(letterRaw || "").trim().slice(0, 1).toUpperCase()}
+                          .{" "}
+                        </span>
+                      )}
+                      <span>Order: {sortLabel}. </span>
+                      <span>Showing up to {limit}.</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              <RecipeSearchPanel
+                initialQ={q}
+                initialTags={tags}
+                initialCategory={category}
+                initialArea={area}
+                initialIngredient={ingredient}
+                initialLetter={letterRaw}
+                initialSort={sort}
+                initialLimit={limit}
+                expandAdvancedWhenDirty
+              />
             </div>
           </nav>
-          {status === "loading" ? (
-            <div className="w-full mt-10 lg:px-96 lg:mx-36 px-8">
-              <center>
-                <div className="text-xl font-bold px-5">Loading recipes...</div>
-              </center>
+
+          {!hasSearch && (
+            <div className="mx-auto max-w-2xl py-16 text-center text-gray-600">
+              <p className="text-base leading-relaxed">
+                Use the bar above for names, tags, cuisines, and ingredients—or
+                open{" "}
+                <span className="font-semibold text-emerald-800">
+                  Advanced search
+                </span>{" "}
+                for category, country, first letter, main ingredient, sort, and
+                how many results to load.
+              </p>
             </div>
-          ) : status === "error" ? (
-            <div className="w-full mt-10 lg:px-96 lg:mx-36 px-8">
-              <center>
-                <div className="text-lg px-5">
-                  Error refresh your page: {error.message}
-                </div>
-              </center>
+          )}
+
+          {hasSearch && status === "error" && (
+            <div className="mx-auto max-w-lg px-4 py-12 text-center">
+              <p className="text-base text-gray-700">
+                Something went wrong. Try again in a moment.
+              </p>
+              <p className="mt-2 text-sm text-red-600">{error?.message}</p>
             </div>
-          ) : (
-            <>
-              {data.pages.map((page) => (
-                <>
-                  {page.posts.map((recipe) => (
-                    <RecipeCard post={recipe} />
-                  ))}
-                </>
+          )}
+
+          {loading && (
+            <div className="mx-auto max-w-lg px-4 py-16 text-center">
+              <p className="text-lg font-semibold text-gray-700">
+                Loading recipes…
+              </p>
+            </div>
+          )}
+
+          {showEmpty && (
+            <div className="mx-auto max-w-lg py-12 text-center text-gray-600">
+              <p className="text-base font-medium text-gray-800">
+                No recipes matched your search.
+              </p>
+              <p className="mt-2 text-sm">
+                Try fewer keywords, another dish type or country, relax tag
+                filters, or raise the max results in advanced options.
+              </p>
+            </div>
+          )}
+
+          {hasSearch && status === "success" && resultCount > 0 && (
+            <div className={RECIPE_GRID}>
+              {sortedPosts.map((recipe) => (
+                <RecipeCard key={recipe.idMeal} post={recipe} />
               ))}
-              <div className="w-full mt-10 lg:px-96 lg:mx-36 px-8">
-                <button
-                  ref={ref}
-                  onClick={() => fetchNextPage()}
-                  disabled={!hasNextPage || isFetchingNextPage}
-                  className="bg-red-900 hover:bg-red-700 py-2 px-4 rounded-xl text-white"
-                >
-                  <center>
-                    {isFetchingNextPage
-                      ? "Loading more..."
-                      : hasNextPage
-                      ? "Load Newer"
-                      : "Nothing more to load"}
-                  </center>
-                </button>
-              </div>
-            </>
+            </div>
           )}
         </div>
       </section>

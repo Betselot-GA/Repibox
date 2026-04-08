@@ -1,5 +1,5 @@
 
-# Repibox
+# Foodie
 
 react app that shows you recipes of your fevorite foods
 

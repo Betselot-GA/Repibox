@@ -1,15 +1,21 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useInfiniteQuery } from "react-query";
 import { useInView } from "react-intersection-observer";
 import { fetchRecipes } from "./utils/queries.js";
 import RecipeCard from "./components/RecipeCard";
-import { AiOutlineSearch } from "react-icons/ai";
-import { useNavigate } from "react-router-dom";
+import RecipeSearchPanel from "./components/RecipeSearchPanel.js";
+
+const PAGE_SHELL =
+  "min-h-screen bg-gradient-to-b from-emerald-50/95 via-white to-slate-50/90";
+const PAGE_INNER =
+  "w-full max-w-[1600px] mx-auto px-4 pb-20 pt-6 sm:px-6 sm:pt-8 lg:px-10";
+
+const RECIPE_GRID =
+  "grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 sm:gap-8";
+
 export default function recipes() {
   const { ref, inView } = useInView();
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
   const {
     status,
     data,
@@ -21,11 +27,6 @@ export default function recipes() {
     getNextPageParam: (lastPage) => lastPage.page ?? undefined,
   });
 
-  const submitData = async (e) => {
-    e.preventDefault();
-    navigate("/" + searchQuery, { replace: true });
-  };
-
   useEffect(() => {
     if (inView) {
       fetchNextPage();
@@ -33,78 +34,59 @@ export default function recipes() {
   }, [fetchNextPage, inView]);
 
   return (
-    <section className="bg-white py-8">
-      <div className="container mx-auto flex items-center flex-wrap pt-4 pb-12">
-        <nav id="store" className="w-full z-30 top-0 px-6 py-1">
-          <div className="w-full container mx-auto flex flex-wrap items-center justify-between mt-0 px-2 py-3">
+    <section className={PAGE_SHELL}>
+      <div className={PAGE_INNER}>
+        <nav
+          className="mb-10 w-full border-b border-emerald-100/90 pb-8"
+          aria-label="Recipe search"
+        >
+          <div className="flex flex-col gap-6">
             <a
-              className="uppercase tracking-wide no-underline hover:no-underline font-bold text-gray-800 text-xl "
+              className="w-fit text-lg font-bold uppercase tracking-wide text-gray-800 no-underline hover:text-emerald-800 sm:text-xl"
               href="/"
               id="recipes"
             >
               Recipes
             </a>
-
-            <form
-              onSubmit={submitData}
-              className="flex items-center"
-              id="store-nav-content"
-            >
-              <input
-                type="text"
-                className="border rounded py-1 px-3"
-                placeholder="search recipe..."
-                value={searchQuery}
-                required
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-
-              <button
-                disabled={searchQuery == null}
-                type="submit"
-                className="pl-3 inline-block no-underline hover:text-black"
-                href="/"
-              >
-                <AiOutlineSearch size={25} />
-              </button>
-            </form>
+            <RecipeSearchPanel />
           </div>
         </nav>
+
         {status === "loading" ? (
-          <div className="w-full mt-10 lg:px-96 lg:mx-36 px-8">
-            <center>
-              <div className="text-xl font-bold px-5">Loading recipes...</div>
-            </center>
+          <div className="mx-auto max-w-lg px-4 py-16 text-center min-h-[40vh] flex flex-col justify-center">
+            <p className="text-lg font-semibold text-gray-700">
+              Loading recipes…
+            </p>
           </div>
         ) : status === "error" ? (
-          <div className="w-full mt-10 lg:px-96 lg:mx-36 px-8">
-            <center>
-              <div className="text-lg px-5">Error refresh your page: {error.message}</div>
-            </center>
+          <div className="mx-auto max-w-lg px-4 py-12 text-center">
+            <p className="text-base text-gray-700">
+              Something went wrong. Refresh the page and try again.
+            </p>
+            <p className="mt-2 text-sm text-red-600">{error.message}</p>
           </div>
         ) : (
           <>
-            {data.pages.map((page) => (
-              <>
-                {page.posts.map((recipe) => (
-                  <RecipeCard post={recipe} />
-                ))}
-              </>
-            ))}
-            <div className="w-full mt-10 lg:px-96 lg:mx-36 px-8">
+            <div className={RECIPE_GRID}>
+              {data.pages.flatMap((page) =>
+                page.posts.map((recipe) => (
+                  <RecipeCard key={recipe.idMeal} post={recipe} />
+                ))
+              )}
+            </div>
+            <div className="mt-12 flex w-full justify-center px-2 sm:mt-16">
               <button
                 ref={ref}
+                type="button"
                 onClick={() => fetchNextPage()}
                 disabled={!hasNextPage || isFetchingNextPage}
-                className="bg-red-900 hover:bg-red-700 py-2 px-4 rounded-xl text-white"
+                className="w-full max-w-md rounded-xl border-2 border-emerald-700 bg-emerald-700 px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                <center>
-                  {isFetchingNextPage
-                    ? "Loading more..."
-                    : hasNextPage
-                    ? "Load Newer"
-                    : "Nothing more to load"}
-                </center>
+                {isFetchingNextPage
+                  ? "Loading more…"
+                  : hasNextPage
+                  ? "Load more"
+                  : "No more recipes"}
               </button>
             </div>
           </>
